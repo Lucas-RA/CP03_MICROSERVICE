@@ -12,46 +12,55 @@ import org.springframework.web.bind.annotation.RequestBody;
 
 import org.springframework.web.bind.annotation.RestController;
 
-import br.com.fiap.cp01_api01.repository.FutebolRepository;
 
+import br.com.fiap.cp01_api01.service.FutebolService;
+import br.com.fiap.cp01_api01.dto.FutebolCreateRequest;
+import br.com.fiap.cp01_api01.dto.FutebolMapper;
+import br.com.fiap.cp01_api01.dto.FutebolResponse;
+import br.com.fiap.cp01_api01.dto.FutebolUpdateRequest;
 import br.com.fiap.cp01_api01.model.Futebol;
 import java.util.List;
-import java.util.Optional;
+
 
 @RestController
 @RequestMapping ("/copa")
 public class FutebolController {
 
     @Autowired
-    private FutebolRepository repository;
+    private FutebolService service;
 
-    @GetMapping
-    public ResponseEntity<List<Futebol>> findAll(){
-        repository.findAll();
-        return ResponseEntity.ok(repository.findAll());
+    @Autowired
+    private FutebolMapper futebolMapper;
+
+    @PostMapping
+    public ResponseEntity<FutebolResponse> create(@RequestBody FutebolCreateRequest dtoRequest) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(futebolMapper.toDTO(service.createOrUpdate(futebolMapper.toModel(dtoRequest))));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Futebol> findById(@PathVariable Long id) {
-        return repository
+    public ResponseEntity<FutebolResponse> findById(@PathVariable Long id) {
+        return service
                 .findById(id)
+                .map(futebol -> futebolMapper.toDTO(futebol))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @PostMapping
-    public ResponseEntity<Futebol> create(@RequestBody Futebol futebol) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(repository.save(futebol));
+    @GetMapping
+    public ResponseEntity<List<FutebolResponse>> findAll(){
+        return ResponseEntity.ok(service.findAll()
+        .stream()
+        .map(futebol -> futebolMapper.toDTO(futebol))
+        .toList()
+        );
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Futebol> update(@PathVariable Long id, @RequestBody Futebol futebol) {
-        Optional<Futebol> optFutebol = repository.findById(id);
-
-        if (optFutebol.isPresent()) {
-            futebol.setId(id);
-            Futebol futebolAlterado = repository.save(futebol);
-            return ResponseEntity.ok(futebolAlterado);
+    public ResponseEntity<FutebolResponse> update(@PathVariable Long id, @RequestBody FutebolUpdateRequest dtoRequest) {
+        if (service.findById(id).isPresent()) {
+            Futebol futebol = futebolMapper.toModel(id, dtoRequest);
+            return ResponseEntity.ok(futebolMapper.toDTO(service.createOrUpdate(futebol)));
         } else {
             return ResponseEntity.notFound().build();
         }
@@ -59,7 +68,11 @@ public class FutebolController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteById(@PathVariable Long id) { 
-        repository.deleteById(id);
-        return ResponseEntity.noContent().build(); 
+        if (service.findById(id).isPresent()) {
+            service.deleteById(id);
+            return ResponseEntity.noContent().build();
+        } else{
+            return ResponseEntity.notFound().build();
+        }
 }
 }
